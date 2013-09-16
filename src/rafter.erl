@@ -5,7 +5,7 @@
 -include("rafter_opts.hrl").
 
 %% API
--export([start_node/2, stop_node/1, op/2, set_config/2, 
+-export([start_node/2, stop_node/1, op/2, read_op/2, set_config/2, 
          get_state/1, get_leader/1, get_entry/2, get_last_entry/1]).
 
 %% Test API
@@ -22,6 +22,9 @@ stop_node(Peer) ->
 op(Peer, Command) ->
     Id = druuid:v4(),
     rafter_consensus_fsm:op(Peer, {Id, Command}).
+
+read_op(Peer, Command) ->
+    rafter_consensus_fsm:read_op(Peer, Command).
 
 set_config(Peer, NewServers) ->
     Id = druuid:v4(),
@@ -51,7 +54,7 @@ get_last_entry(Peer) ->
 start_cluster() ->
     application:start(lager),
     application:start(rafter),
-    Opts = #rafter_opts{state_machine=rafter_sm_echo, logdir="./log"},
+    Opts = #rafter_opts{state_machine=rafter_backend_echo, logdir="./log"},
     Peers = [peer1, peer2, peer3, peer4, peer5],
     [rafter_sup:start_peer(Me, Opts) || Me <- Peers].
 
@@ -59,5 +62,5 @@ start_test_node(Name) ->
     application:start(lager),
     application:start(rafter),
     Me = {Name, node()},
-    Opts = #rafter_opts{state_machine=rafter_sm_echo, logdir="./"},
+    Opts = #rafter_opts{state_machine=rafter_backend_echo, logdir="./"},
     start_node(Me, Opts).

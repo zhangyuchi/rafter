@@ -81,6 +81,7 @@ init([Me, #rafter_opts{state_machine=StateMachine}]) ->
                    timer_start=os:timestamp(),
                    timer_duration = Duration,
                    state_machine=StateMachine},
+    ok = StateMachine:init(),
     NewState = State#state{config=rafter_log:get_config(Me)},
     {ok, follower, NewState, Duration}.
 
@@ -193,28 +194,27 @@ follower({set_config, {Id, NewServers}}, From,
     end;
 
 follower({set_config, _}, _From, #state{leader=undefined, me=Me, config=C}=State) ->
-    Error =
-        case rafter_config:has_vote(Me, C) of
-            false ->
-                not_consensus_group_member;
-            true ->
-                election_in_progress
-        end,
+    Error = no_leader_error(Me, C),
     {reply, {error, Error}, follower, State, ?timeout()};
 
 follower({set_config, _}, _From, #state{leader=Leader}=State) ->
     Reply = {error, {redirect, Leader}},
     {reply, Reply, follower, State, ?timeout()};
 
+follower({read_op, _}, _From, #state{me=Me, config=Config,
+                                           leader=undefined}=State) ->
+    Error = no_leader_error(Me, Config),
+    {reply, {error, Error}, follower, State, ?timeout()};
+
+follower({read_op, _}, _From, #state{leader=Leader}=State) ->
+    Reply = {error, {redirect, Leader}},
+    {reply, Reply, follower, State, ?timeout()};
+    
 follower({op, _Command}, _From, #state{me=Me, config=Config, 
                                        leader=undefined}=State) ->
-    Error = case rafter_config:has_vote(Me, Config) of
-        false ->
-            not_consensus_group_member;
-        true ->
-            election_in_progress
-    end,
+    Error = no_leader_error(Me, Config),
     {reply, {error, Error}, follower, State, ?timeout()};
+
 follower({op, _Command}, _From, #state{leader=Leader}=State) ->
     Reply = {error, {redirect, Leader}},
     {reply, Reply, follower, State, ?timeout()}.
@@ -333,6 +333,8 @@ candidate(#append_entries{}, _From, State) ->
 
 %% We are in the middle of an election. 
 %% Leader should always be undefined here.
+candidate({read_op, _}, _, #state{leader=undefined}=State) ->
+    {reply, {error, election_in_progress}, candidate, State, ?timeout()};
 candidate({op, _Command}, _From, #state{leader=undefined}=State) ->
     {reply, {error, election_in_progress}, candidate, State, ?timeout()}.
 
@@ -453,6 +455,10 @@ leader({set_config, {Id, NewServers}}, From,
     end;
 
 %% Handle client requests
+leader({read_op, Command}, _, #state{state_machine=StateMachine}=State) ->
+    {ok, Reply} = StateMachine:read(Command),
+    {reply, Reply, leader, State, ?timeout()};
+
 leader({op, {Id, Command }}, From, 
         #state{term=Term}=State) ->
     Entry = #rafter_entry{type=op, term=Term, cmd=Command},
@@ -462,6 +468,14 @@ leader({op, {Id, Command }}, From,
 %%=============================================================================
 %% Internal Functions 
 %%=============================================================================
+
+no_leader_error(Me, Config) ->
+    case rafter_config:has_vote(Me, Config) of
+        false ->
+            not_consensus_group_member;
+        true ->
+            election_in_progress
+    end.
 
 send_next_entry(From, Followers, Responses, #state{me=Me}=State) ->
     NextIndex = increment_follower_index(From, Followers),
@@ -575,7 +589,7 @@ commit_entries(NewCommitIndex, #state{commit_index=CommitIndex,
 
            %% Normal Operation. Apply Command to StateMachine.
            {ok, #rafter_entry{type=op, cmd=Command}} ->
-               {ok, Result} = StateMachine:apply(Command),
+               {ok, Result} = StateMachine:write(Command),
                maybe_send_client_reply(Index, CliReqs, NewState, Result);
 
            %% We have a committed transitional state, so reply 
