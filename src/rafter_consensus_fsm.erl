@@ -538,7 +538,7 @@ send_client_timeout_reply(#client_req{from=From}) ->
     gen_fsm:reply(From, {error, timeout}).
 
 send_client_reply(#client_req{from=From}, Result) ->
-    gen_fsm:reply(From, {ok, Result}).
+    gen_fsm:reply(From, Result).
 
 find_client_req(Id, ClientRequests) ->
     Result = lists:filter(fun(Req) ->
@@ -589,7 +589,7 @@ commit_entries(NewCommitIndex, #state{commit_index=CommitIndex,
 
            %% Normal Operation. Apply Command to StateMachine.
            {ok, #rafter_entry{type=op, cmd=Command}} ->
-               {ok, Result} = StateMachine:write(Command),
+               Result = StateMachine:write(Command),
                maybe_send_client_reply(Index, CliReqs, NewState, Result);
 
            %% We have a committed transitional state, so reply 
