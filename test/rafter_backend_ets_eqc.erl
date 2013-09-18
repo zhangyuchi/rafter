@@ -65,7 +65,8 @@ command(_State) ->
         {200, {call, rafter_backend_ets, read, [{get, table_gen(), key_gen()}]}},
         {200, {call, rafter_backend_ets, write, 
                 [{put, table_gen(), key_gen(), value_gen()}]}},
-        {20, {call, rafter_backend_ets, read, [list_tables]}}]).
+        {20, {call, rafter_backend_ets, read, [list_tables]}},
+        {20, {call, rafter_backend_ets, read, [{list_keys, table_gen()}]}}]).
 
 precondition(#state{}, _) ->
     true.
@@ -118,6 +119,16 @@ postcondition(#state{tables=Tables},
         lists:all(fun(Table) ->
                       sets:is_element(Table, Tables)
                   end, Keys);
+
+postcondition(#state{tables=Tables, data=Data}, 
+    {call, rafter_backend_ets, read, [{list_keys, Table}]}, {ok, Keys}) ->
+        sets:is_element(Table, Tables) andalso
+        lists:all(fun(Key) ->
+                      lists:keyfind({Table, Key}, 1, Data) =/= false
+                  end, Keys);
+postcondition(#state{tables=Tables}, 
+    {call, rafter_backend_ets, read, [{list_keys, Table}]}, {error, badarg}) ->
+        not sets:is_element(Table, Tables); 
 
 postcondition(#state{tables=Tables},
     {call, rafter_backend_ets, write, [{put, Table, _Key, Value}]},

@@ -28,7 +28,14 @@ read({get, Table, Key}) ->
     end;
 
 read(list_tables) ->
-    {ok, [Table || {Table} <- ets:tab2list(rafter_backend_ets_tables)]}.
+    {ok, [Table || {Table} <- ets:tab2list(rafter_backend_ets_tables)]};
+
+read({list_keys, Table}) ->
+    try
+        list_keys(Table)
+    catch _:E ->
+        {error, E}
+    end.
 
 write({new, Name}) ->
     try
@@ -68,6 +75,14 @@ write({delete, Table, Key}) ->
     catch _:E ->
         {error, E}
     end.
+
+list_keys(Table) ->
+    list_keys(ets:first(Table), Table, []).
+
+list_keys('$end_of_table', _Table, Keys) ->
+    {ok, Keys};
+list_keys(Key, Table, Keys) ->
+    list_keys(ets:next(Table, Key), Table, [Key | Keys]).
 
 write_updates(Updates) ->
     [ets:insert(Table, Obj) || {Table, Obj} <- Updates].
