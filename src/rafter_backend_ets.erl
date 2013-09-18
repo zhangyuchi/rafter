@@ -17,7 +17,12 @@ stop() ->
 
 read({get, Table, Key}) ->
     try 
-        {ok, ets:lookup(Table, Key)}
+        case ets:lookup(Table, Key) of
+            [{Key, Value}] -> 
+                {ok, Value};
+            [] ->
+                {ok, not_found}
+        end
     catch _:E ->
         {error, E}
     end.
