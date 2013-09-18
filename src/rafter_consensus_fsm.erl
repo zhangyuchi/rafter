@@ -598,7 +598,8 @@ commit_entries(NewCommitIndex, #state{commit_index=CommitIndex,
            {ok, #rafter_entry{type=config, 
                    cmd=#config{state=transitional}=C}} ->
                S = stabilize_config(C, NewState),
-               maybe_send_client_reply(Index, CliReqs, S, S#state.config);
+               Reply = {ok, S#state.config},
+               maybe_send_client_reply(Index, CliReqs, S, Reply);
 
            %% The configuration has already been set. Initial configuration goes
            %% directly to stable state so needs to send a reply. Checking for
@@ -606,7 +607,8 @@ commit_entries(NewCommitIndex, #state{commit_index=CommitIndex,
            %% infrequently.
            {ok, #rafter_entry{type=config,
                    cmd=#config{state=stable}}} ->
-               maybe_send_client_reply(Index, CliReqs, NewState, NewState#state.config)
+               Reply = {ok, NewState#state.config},
+               maybe_send_client_reply(Index, CliReqs, NewState, Reply)
        end
    end, State, lists:seq(CommitIndex+1, LastIndex)).
 
