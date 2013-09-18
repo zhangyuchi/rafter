@@ -57,14 +57,15 @@ cleanup(State, Res) ->
 initial_state() ->
     #state{}.
 
-command(#state{}) ->
+command(_State) ->
     frequency([
         {10, {call, rafter_backend_ets, write, [{new, table_gen()}]}},
         {3, {call, rafter_backend_ets, write, [{delete, table_gen()}]}},
         {100, {call, rafter_backend_ets, write, [{delete, table_gen(), key_gen()}]}},
         {200, {call, rafter_backend_ets, read, [{get, table_gen(), key_gen()}]}},
         {200, {call, rafter_backend_ets, write, 
-                [{put, table_gen(), key_gen(), value_gen()}]}}]).
+                [{put, table_gen(), key_gen(), value_gen()}]}},
+        {20, {call, rafter_backend_ets, read, [list_tables]}}]).
 
 precondition(#state{}, _) ->
     true.
@@ -110,6 +111,13 @@ postcondition(#state{data=Data, tables=Tables},
     {call, rafter_backend_ets, read, [{get, Table, Key}]}, {error, _}) ->
         not sets:is_element(Table, Tables) andalso
         lists:keyfind({Table, Key}, 1, Data)  =:= false;
+
+postcondition(#state{tables=Tables}, 
+    {call, rafter_backend_ets, read, [list_tables]}, {ok, Keys}) ->
+        length(Keys) =:= sets:size(Tables) andalso
+        lists:all(fun(Table) ->
+                      sets:is_element(Table, Tables)
+                  end, Keys);
 
 postcondition(#state{tables=Tables},
     {call, rafter_backend_ets, write, [{put, Table, _Key, Value}]},

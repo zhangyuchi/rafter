@@ -25,7 +25,10 @@ read({get, Table, Key}) ->
         end
     catch _:E ->
         {error, E}
-    end.
+    end;
+
+read(list_tables) ->
+    {ok, [Table || {Table} <- ets:tab2list(rafter_backend_ets_tables)]}.
 
 write({new, Name}) ->
     try
@@ -44,9 +47,9 @@ write({put, Table, Key, Value}) ->
         {error, E}
     end;
 
-write({transaction, TableKeyPairs, Fun}) ->
+write({transaction, TableKeyPairs, {Mod, Fun, Arg1}}) ->
     Data = [{Table, Key, ets:lookup(Table, Key)} || {Table, Key} <- TableKeyPairs],
-    {Result, Updates} = Fun(Data),
+    {Result, Updates} = Mod:Fun(Arg1, Data),
     write_updates(Updates),
     {ok, Result};
 
