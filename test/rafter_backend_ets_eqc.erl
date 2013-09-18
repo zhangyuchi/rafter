@@ -60,7 +60,7 @@ initial_state() ->
 command(#state{}) ->
     frequency([
         {10, {call, rafter_backend_ets, write, [{new, table_gen()}]}},
-        {1, {call, rafter_backend_ets, write, [{delete, table_gen()}]}},
+        {3, {call, rafter_backend_ets, write, [{delete, table_gen()}]}},
         {100, {call, rafter_backend_ets, write, [{delete, table_gen(), key_gen()}]}},
         {200, {call, rafter_backend_ets, write, 
                 [{put, table_gen(), key_gen(), value_gen()}]}}]).
@@ -118,12 +118,18 @@ postcondition(#state{tables=Tables},
         not sets:is_element(Table, Tables).
 
 invariant(State) ->
+    tables_are_listed_in_ets_tables_table(State) andalso
     tables_exist(State) andalso
     data_is_correct(State).
 
 %% ====================================================================
 %% Invariants 
 %% ====================================================================
+tables_are_listed_in_ets_tables_table(#state{tables=Tables}) ->
+    ListedTables = sets:from_list([T || {T} <- ets:tab2list(rafter_backend_ets_tables)]),
+    UnionSize = sets:size(sets:union(Tables, ListedTables)),
+    UnionSize =:= sets:size(ListedTables) andalso UnionSize =:= sets:size(Tables).
+
 tables_exist(#state{tables=Tables}) ->
     EtsTables = sets:from_list(ets:all()),
     sets:is_subset(Tables, EtsTables).

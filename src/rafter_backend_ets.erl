@@ -6,18 +6,26 @@
 -export([init/0, stop/0, read/1, write/1]).
 
 init() ->
+    stop(),
     ets:new(rafter_backend_ets, [set, named_table, public]),
+    ets:new(rafter_backend_ets_tables, [set, named_table, public]),
     ok.
 
 stop() ->
-    ets:delete(rafter_backend_ets).
+    catch ets:delete(rafter_backend_ets),
+    catch ets:delete(rafter_backend_ets_tables).
 
 read({get, Table, Key}) ->
-    ets:lookup(Table, Key).
+    try 
+        {ok, ets:lookup(Table, Key)}
+    catch _:E ->
+        {error, E}
+    end.
 
 write({new, Name}) ->
     try
         ets:new((Name), [ordered_set, named_table, public]),
+        ets:insert(rafter_backend_ets_tables, {Name}),
         {ok, Name}
     catch _:E ->
         {error, E}
@@ -39,7 +47,9 @@ write({transaction, TableKeyPairs, Fun}) ->
 
 write({delete, Table}) ->
     try
-        {ok, ets:delete(Table)}
+        ets:delete(Table),
+        ets:delete(rafter_backend_ets_tables, Table),
+        {ok, true}
     catch _:E ->
         {error, E}
     end;
